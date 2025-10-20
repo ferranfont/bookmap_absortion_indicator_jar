@@ -18,6 +18,7 @@ bid_volume_agresion = {}
 volume_indicators = {}
 initiation_indicators = {}
 agresion_indicators = {}
+only_ask_indicators = {}
 req_id_to_alias = {}
 req_id = 1
 
@@ -63,7 +64,7 @@ def handle_trade(addon, alias, price, size, is_otc, is_bid, is_execution_start, 
         cum_bid_vol = sum(bid_volume_window[alias])
         bm.add_point(addon, alias, volume_indicators[alias], cum_bid_vol)
 
-    # 2. Initiation - Diferencia ASK - BID (AMARILLO)
+    # 2. Initiation - Diferencia ASK - BID 
     if alias in initiation_indicators:
         initiation = ask_volume[alias] - bid_volume[alias]  # ASK - BID
         bm.add_point(addon, alias, initiation_indicators[alias], initiation)
@@ -78,9 +79,14 @@ def handle_trade(addon, alias, price, size, is_otc, is_bid, is_execution_start, 
             agresion = ask_volume_agresion[alias] - bid_volume_agresion[alias]
             bm.add_point(addon, alias, agresion_indicators[alias], agresion)
 
+    # 4. only_ask - Solo compras agresivas (ASK), se resetea con spike (AMARILLO)
+    if alias in only_ask_indicators:
+        only_ask = ask_volume_agresion[alias]
+        bm.add_point(addon, alias, only_ask_indicators[alias], only_ask)
+
 
 def handle_indicator_response(addon, request_id, indicator_id):
-    global volume_indicators, initiation_indicators, agresion_indicators, req_id_to_alias
+    global volume_indicators, initiation_indicators, agresion_indicators, only_ask_indicators, req_id_to_alias
     alias, indicator_type = req_id_to_alias[request_id]
 
     if indicator_type == "volume":
@@ -89,6 +95,8 @@ def handle_indicator_response(addon, request_id, indicator_id):
         initiation_indicators[alias] = indicator_id
     elif indicator_type == "agresion":
         agresion_indicators[alias] = indicator_id
+    elif indicator_type == "only_ask":
+        only_ask_indicators[alias] = indicator_id
 
 
 def handle_subscribe_instrument(addon, alias, full_name, is_crypto, pips, size_multiplier, instrument_multiplier, supported_features):
@@ -108,6 +116,11 @@ def handle_subscribe_instrument(addon, alias, full_name, is_crypto, pips, size_m
     req_id += 1
     req_id_to_alias[req_id] = (alias, "agresion")
     bm.register_indicator(addon, alias, req_id, "imbalance", "BOTTOM", color=(0, 255, 0))
+
+    # Indicador 4: only_ask - Solo compras agresivas, se resetea con spike (AMARILLO)
+    req_id += 1
+    req_id_to_alias[req_id] = (alias, "only_ask")
+    bm.register_indicator(addon, alias, req_id, "only_ask", "BOTTOM", color=(255, 255, 0))
 
     # Suscribirse a trades
     bm.subscribe_to_trades(addon, alias, 1)
